@@ -9,7 +9,6 @@
     "url": "https://github.com/lojjic/webgl-sdf-generator.git"
   },
   "scripts": {
-    "postinstall": "npm run build",
     "build": "rollup -c rollup.config.js",
     "test": "npm run build && node test/run.js"
   },
