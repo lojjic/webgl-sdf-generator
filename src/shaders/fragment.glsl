@@ -4,7 +4,6 @@ uniform float uMaxDistance;
 uniform float uExponent;
 varying vec4 vLineSegment;
 varying vec2 vGlyphXY;
-varying vec2 vUV;
 
 float absDistToSegment(vec2 point, vec2 lineA, vec2 lineB) {
   vec2 lineDir = lineB - lineA;
