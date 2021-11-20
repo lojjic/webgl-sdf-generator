@@ -9,19 +9,17 @@ let gl
 let instancingExtension
 let blendMinMaxExtension
 let program
-let viewportPosBuffer
-let lineSegmentsBuffer
-let boundsUniform
-let maxDistUniform
-let expUniform
+let buffers = {}
+let uniforms = {}
 let lastWidth
 let lastHeight
 let supported = null
 let isTestingSupport = false
 
 function handleContextLoss () {
-  instancingExtension = blendMinMaxExtension = program = viewportPosBuffer =
-    lineSegmentsBuffer = boundsUniform = maxDistUniform = expUniform = lastWidth = lastHeight = undefined
+  instancingExtension = blendMinMaxExtension = program = lastWidth = lastHeight = undefined
+  buffers = {}
+  uniforms = {}
 }
 
 function compileShader (gl, src, type) {
@@ -33,6 +31,27 @@ function compileShader (gl, src, type) {
     throw new Error(gl.getShaderInfoLog(shader).trim())
   }
   return shader
+}
+
+function setAttributeBuffer(name, size, usage, instancingDivisor, data) {
+  if (!buffers[name]) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers[name] = gl.createBuffer())
+    const attrLocation = gl.getAttribLocation(program, name)
+    gl.vertexAttribPointer(attrLocation, size, gl.FLOAT, false, 0, 0)
+    gl.enableVertexAttribArray(attrLocation)
+    if (instancingDivisor) {
+      instancingExtension.vertexAttribDivisorANGLE(attrLocation, instancingDivisor)
+    }
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffers[name])
+  gl.bufferData(gl.ARRAY_BUFFER, data, usage)
+}
+
+function setUniform(name, ...values) {
+  if (!uniforms[name]) {
+    uniforms[name] = gl.getUniformLocation(program, name)
+  }
+  gl[`uniform${values.length}f`](uniforms[name], ...values)
 }
 
 export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
@@ -98,36 +117,14 @@ export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDis
   }
   gl.useProgram(program)
 
-  // Init attributes
-  if (!viewportPosBuffer) {
-    viewportPosBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, viewportPosBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, viewportUVs, gl.STATIC_DRAW)
-    const viewportPosAttrLoc = gl.getAttribLocation(program, 'aUV')
-    gl.vertexAttribPointer(viewportPosAttrLoc, 2, gl.FLOAT, false, 0, 0)
-    gl.enableVertexAttribArray(viewportPosAttrLoc)
-  }
-  if (!lineSegmentsBuffer) {
-    lineSegmentsBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, lineSegmentsBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, lineSegmentCoords, gl.DYNAMIC_DRAW)
-    const lineSegmentsAttrLoc = gl.getAttribLocation(program, 'aLineSegment')
-    gl.vertexAttribPointer(lineSegmentsAttrLoc, 4, gl.FLOAT, false, 0, 0)
-    gl.enableVertexAttribArray(lineSegmentsAttrLoc)
-    instancingExtension.vertexAttribDivisorANGLE(lineSegmentsAttrLoc, 1)
-  }
-  gl.bindBuffer(gl.ARRAY_BUFFER, lineSegmentsBuffer)
-  gl.bufferData(gl.ARRAY_BUFFER, lineSegmentCoords, gl.DYNAMIC_DRAW)
+  // Init/update attributes
+  setAttributeBuffer('aUV', 2, gl.STATIC_DRAW, 0, viewportUVs)
+  setAttributeBuffer('aLineSegment', 4, gl.DYNAMIC_DRAW, 1, lineSegmentCoords)
 
-  // Init uniforms
-  boundsUniform = boundsUniform || gl.getUniformLocation(program, 'uGlyphBounds')
-  gl.uniform4f(boundsUniform, ...viewBox)
-
-  maxDistUniform = maxDistUniform || gl.getUniformLocation(program, 'uMaxDistance')
-  gl.uniform1f(maxDistUniform, maxDistance)
-
-  expUniform = expUniform || gl.getUniformLocation(program, 'uExponent')
-  gl.uniform1f(expUniform, sdfExponent)
+  // Init/update uniforms
+  setUniform('uGlyphBounds', ...viewBox)
+  setUniform('uMaxDistance', maxDistance)
+  setUniform('uExponent', sdfExponent)
 
   // Draw
   gl.clear(gl.COLOR_BUFFER_BIT)
