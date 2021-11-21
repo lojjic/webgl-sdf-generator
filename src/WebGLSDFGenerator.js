@@ -1,8 +1,9 @@
-import { pathToLineSegments } from './path.js'
+import { forEachPathCommand } from './path.js'
 import vertexShader from './shaders/vertex.glsl'
 import fragmentShader from './shaders/fragment.glsl'
 
 const viewportUVs = new Float32Array([0, 0, 2, 0, 0, 2])
+const commandsEnum = {L: 0, Q: 1, C: 2}
 
 let canvas
 let gl
@@ -61,11 +62,17 @@ export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDis
   }
 
   // Compute path segments
-  let lineSegmentCoords = []
-  pathToLineSegments(path, (x1, y1, x2, y2) => {
-    lineSegmentCoords.push(x1, y1, x2, y2)
+  let commands = []
+  let endPoints = []
+  let ctrlPoints = []
+  forEachPathCommand(path, (command, startX, startY, endX, endY, ctrl1X, ctrl1Y, ctrl2X, ctrl2Y, ) => {
+    commands.push(commandsEnum[command])
+    endPoints.push(startX, startY, endX, endY)
+    ctrlPoints.push(ctrl1X, ctrl1Y, ctrl2X, ctrl2Y)
   })
-  lineSegmentCoords = new Float32Array(lineSegmentCoords)
+  commands = new Float32Array(commands)
+  endPoints = new Float32Array(endPoints)
+  ctrlPoints = new Float32Array(ctrlPoints)
 
   // Init canvas
   if (!canvas) {
@@ -119,7 +126,9 @@ export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDis
 
   // Init/update attributes
   setAttributeBuffer('aUV', 2, gl.STATIC_DRAW, 0, viewportUVs)
-  setAttributeBuffer('aLineSegment', 4, gl.DYNAMIC_DRAW, 1, lineSegmentCoords)
+  setAttributeBuffer('aCommand', 1, gl.DYNAMIC_DRAW, 1, commands)
+  setAttributeBuffer('aEndPoints', 4, gl.DYNAMIC_DRAW, 1, endPoints)
+  setAttributeBuffer('aCtrlPoints', 4, gl.DYNAMIC_DRAW, 1, ctrlPoints)
 
   // Init/update uniforms
   setUniform('uGlyphBounds', ...viewBox)
@@ -135,7 +144,7 @@ export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDis
     gl.TRIANGLES,
     0,
     3,
-    lineSegmentCoords.length / 4
+    commands.length
   )
 
   // Read results
