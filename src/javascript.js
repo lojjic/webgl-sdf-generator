@@ -1,6 +1,6 @@
 import { pathToLineSegments } from './path.js'
 
-export function generateSDFWithJS(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
+export function generate (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
   const textureData = new Uint8Array(sdfWidth * sdfHeight)
 
   const viewBoxWidth = viewBox[2] - viewBox[0]
@@ -52,7 +52,7 @@ export function generateSDFWithJS(sdfWidth, sdfHeight, path, viewBox, maxDistanc
    * @param y
    * @returns {number}
    */
-  function findNearestSignedDistance(x, y) {
+  function findNearestSignedDistance (x, y) {
     let closestDistSq = Infinity
     let closestDist = Infinity
 
@@ -79,7 +79,7 @@ export function generateSDFWithJS(sdfWidth, sdfHeight, path, viewBox, maxDistanc
    * Determine whether the given point lies inside or outside the glyph. Uses a simple
    * ray casting algorithm using a ray pointing east from the point.
    */
-  function isPointInPoly(x, y) {
+  function isPointInPoly (x, y) {
     let inside = false
     for (let i = segments.length; i--;) {
       const seg = segments[i]
@@ -96,7 +96,7 @@ export function generateSDFWithJS(sdfWidth, sdfHeight, path, viewBox, maxDistanc
 /**
  * Find the absolute distance from a point to a line segment at closest approach
  */
-function absSquareDistanceToLineSegment(x, y, lineX0, lineY0, lineX1, lineY1) {
+function absSquareDistanceToLineSegment (x, y, lineX0, lineY0, lineX1, lineY1) {
   const ldx = lineX1 - lineX0
   const ldy = lineY1 - lineY0
   const lengthSq = ldx * ldx + ldy * ldy

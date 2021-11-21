@@ -54,9 +54,9 @@ function setUniform(name, ...values) {
   gl[`uniform${values.length}f`](uniforms[name], ...values)
 }
 
-export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
+export function generate (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
   // Verify support
-  if (!isTestingSupport && !supportsWebGLGeneration()) {
+  if (!isTestingSupport && !isSupported()) {
     throw new Error('WebGL generation not supported')
   }
 
@@ -158,7 +158,7 @@ export function generateSDFWithWebGL (sdfWidth, sdfHeight, path, viewBox, maxDis
   return data
 }
 
-export function supportsWebGLGeneration () {
+export function isSupported () {
   if (supported === null) {
     isTestingSupport = true
     let failReason = null
@@ -171,7 +171,7 @@ export function supportsWebGLGeneration () {
         80, 118, 137, 99,
         61, 97, 106, 97
       ]
-      const testResult = generateSDFWithWebGL(
+      const testResult = generate(
         4,
         4,
         'M8,8L16,8L24,24L16,24Z',

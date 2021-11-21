@@ -2,7 +2,7 @@ require('./polyfill/OffscreenCanvas.js')
 const createSDFGenerator = require('../dist/webgl-sdf-generator.js')
 const assert = require('assert')
 
-const { generateSDFWithJS, generateSDFWithWebGL, supportsWebGLGeneration } = createSDFGenerator()
+const { javascript, webgl } = createSDFGenerator()
 
 const captures = [
   {
@@ -25,17 +25,17 @@ const captures = [
 
 const tests = [
   function webglSupport () {
-    assert(supportsWebGLGeneration())
+    assert(webgl.isSupported())
   },
   function webglGeneration () {
     for (const {expected, path, size, exponent, spread, viewBox} of captures) {
-      const result = generateSDFWithWebGL(size, size, path, viewBox, spread, exponent)
+      const result = webgl.generate(size, size, path, viewBox, spread, exponent)
       assert.deepEqual([...result], expected)
     }
   },
   function jsGeneration () {
     for (const {expected, path, size, exponent, spread, viewBox} of captures) {
-      const result = generateSDFWithJS(size, size, path, viewBox, spread, exponent)
+      const result = javascript.generate(size, size, path, viewBox, spread, exponent)
       assert.deepEqual([...result], expected)
     }
   },

@@ -1,5 +1,5 @@
-import { generateSDFWithJS } from './JSSDFGenerator.js'
-import { generateSDFWithWebGL } from './WebGLSDFGenerator.js'
+import { generate as generateWithJS } from './javascript.js'
+import { generate as generateWithWebGL } from './webgl.js'
 
 /**
  * Generate an SDF texture image for a 2D path.
@@ -13,7 +13,7 @@ import { generateSDFWithWebGL } from './WebGLSDFGenerator.js'
  *        will give greater precision nearer the glyph's path.
  * @return {Uint8Array}
  */
-export function generateSDF(
+export function generate(
   sdfWidth,
   sdfHeight,
   path,
@@ -22,9 +22,9 @@ export function generateSDF(
   sdfExponent = 1
 ) {
   try {
-    return generateSDFWithWebGL(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent)
+    return generateWithWebGL(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent)
   } catch(e) {
     console.info('WebGL SDF generation failed, falling back to JS', e)
-    return generateSDFWithJS(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent)
+    return generateWithJS(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent)
   }
 }
