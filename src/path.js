@@ -17,16 +17,23 @@ function pointOnCubicBezier (x0, y0, x1, y1, x2, y2, x3, y3, t, pointOut) {
 }
 
 /**
- * Convert a path string to a series of straight line segments
+ * Parse a path string into its constituent line/curve commands, invoking a callback for each.
  * @param {string} pathString - An SVG-like path string to parse; should only contain commands: M/L/Q/C/Z
- * @param {function(x1:number, y1:number, x2:number, y2:number)} segmentCallback - A callback
- *        function that will be called once for every line segment
- * @param {number} [curvePoints] - How many straight line segments to use when approximating a
- *        bezier curve in the path. Defaults to 16.
+ * @param {function(
+ *   command: 'L'|'Q'|'C',
+ *   startX: number,
+ *   startY: number,
+ *   endX: number,
+ *   endY: number,
+ *   ctrl1X?: number,
+ *   ctrl1Y?: number,
+ *   ctrl2X?: number,
+ *   ctrl2Y?: number
+ * )} commandCallback - A callback function that will be called once for each parsed path command, passing the
+ *                      command identifier (only L/Q/C commands) and its numeric arguments.
  */
-export function pathToLineSegments (pathString, segmentCallback, curvePoints = 16) {
+export function forEachPathCommand(pathString, commandCallback) {
   const segmentRE = /([MLQCZ])([^MLQCZ]*)/g
-  const tempPoint = { x: 0, y: 0 }
   let match, firstX, firstY, prevX, prevY
   while ((match = segmentRE.exec(pathString))) {
     const args = match[2]
@@ -39,62 +46,77 @@ export function pathToLineSegments (pathString, segmentCallback, curvePoints = 1
         prevY = firstY = args[1]
         break
       case 'L':
-        if (args[0] !== prevX || args[1] !== prevY) {
-          //yup, some fonts have zero-length line commands
-          segmentCallback(prevX, prevY, (prevX = args[0]), (prevY = args[1]))
+        if (args[0] !== prevX || args[1] !== prevY) { // yup, some fonts have zero-length line commands
+          commandCallback('L', prevX, prevY, (prevX = args[0]), (prevY = args[1]))
         }
         break
       case 'Q': {
-        let prevCurveX = prevX
-        let prevCurveY = prevY
-        for (let i = 1; i < curvePoints; i++) {
-          pointOnQuadraticBezier(
-            prevX,
-            prevY,
-            args[0],
-            args[1],
-            args[2],
-            args[3],
-            i / (curvePoints - 1),
-            tempPoint
-          )
-          segmentCallback(prevCurveX, prevCurveY, tempPoint.x, tempPoint.y)
-          prevCurveX = tempPoint.x
-          prevCurveY = tempPoint.y
-        }
-        prevX = args[2]
-        prevY = args[3]
+        commandCallback('Q', prevX, prevY, (prevX = args[2]), (prevY = args[3]), args[0], args[1])
         break
       }
       case 'C': {
-        let prevCurveX = prevX
-        let prevCurveY = prevY
-        for (let i = 1; i < curvePoints; i++) {
-          pointOnCubicBezier(
-            prevX,
-            prevY,
-            args[0],
-            args[1],
-            args[2],
-            args[3],
-            args[4],
-            args[5],
-            i / (curvePoints - 1),
-            tempPoint
-          )
-          segmentCallback(prevCurveX, prevCurveY, tempPoint.x, tempPoint.y)
-          prevCurveX = tempPoint.x
-          prevCurveY = tempPoint.y
-        }
-        prevX = args[4]
-        prevY = args[5]
+        commandCallback('C', prevX, prevY, (prevX = args[4]), (prevY = args[5]), args[0], args[1], args[2], args[3])
         break
       }
       case 'Z':
         if (prevX !== firstX || prevY !== firstY) {
-          segmentCallback(prevX, prevY, firstX, firstY)
+          commandCallback('L', prevX, prevY, firstX, firstY)
         }
         break
     }
   }
+}
+
+/**
+ * Convert a path string to a series of straight line segments
+ * @param {string} pathString - An SVG-like path string to parse; should only contain commands: M/L/Q/C/Z
+ * @param {function(x1:number, y1:number, x2:number, y2:number)} segmentCallback - A callback
+ *        function that will be called once for every line segment
+ * @param {number} [curvePoints] - How many straight line segments to use when approximating a
+ *        bezier curve in the path. Defaults to 16.
+ */
+export function pathToLineSegments (pathString, segmentCallback, curvePoints = 16) {
+  const tempPoint = { x: 0, y: 0 }
+  forEachPathCommand(pathString, (command, startX, startY, endX, endY, ctrl1X, ctrl1Y, ctrl2X, ctrl2Y) => {
+    switch (command) {
+      case 'L':
+        segmentCallback(startX, startY, endX, endY)
+        break
+      case 'Q': {
+        let prevCurveX = startX
+        let prevCurveY = startY
+        for (let i = 1; i < curvePoints; i++) {
+          pointOnQuadraticBezier(
+            startX, startY,
+            ctrl1X, ctrl1Y,
+            endX, endY,
+            i / (curvePoints - 1),
+            tempPoint
+          )
+          segmentCallback(prevCurveX, prevCurveY, tempPoint.x, tempPoint.y)
+          prevCurveX = tempPoint.x
+          prevCurveY = tempPoint.y
+        }
+        break
+      }
+      case 'C': {
+        let prevCurveX = startX
+        let prevCurveY = startY
+        for (let i = 1; i < curvePoints; i++) {
+          pointOnCubicBezier(
+            startX, startY,
+            ctrl1X, ctrl1Y,
+            ctrl2X, ctrl2Y,
+            endX, endY,
+            i / (curvePoints - 1),
+            tempPoint
+          )
+          segmentCallback(prevCurveX, prevCurveY, tempPoint.x, tempPoint.y)
+          prevCurveX = tempPoint.x
+          prevCurveY = tempPoint.y
+        }
+        break
+      }
+    }
+  })
 }
