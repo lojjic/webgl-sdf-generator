@@ -1,25 +1,27 @@
 import { pathToLineSegments } from './path.js'
-import vertexShader from './shaders/vertex.glsl'
-import fragmentShader from './shaders/fragment.glsl'
+import vertexShader from './shaders/main.vertex.glsl'
+import fragmentShader from './shaders/main.fragment.glsl'
 
+// Single triangle covering viewport
 const viewportUVs = new Float32Array([0, 0, 2, 0, 0, 2])
+
+const programSources = {
+  main: [vertexShader, fragmentShader]
+}
 
 let canvas
 let gl
 let instancingExtension
 let blendMinMaxExtension
-let program
-let buffers = {}
-let uniforms = {}
+let programs = {}
 let lastWidth
 let lastHeight
 let supported = null
 let isTestingSupport = false
 
 function handleContextLoss () {
-  instancingExtension = blendMinMaxExtension = program = lastWidth = lastHeight = undefined
-  buffers = {}
-  uniforms = {}
+  instancingExtension = blendMinMaxExtension = lastWidth = lastHeight = undefined
+  programs = {}
 }
 
 function compileShader (gl, src, type) {
@@ -33,25 +35,50 @@ function compileShader (gl, src, type) {
   return shader
 }
 
-function setAttributeBuffer(name, size, usage, instancingDivisor, data) {
-  if (!buffers[name]) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers[name] = gl.createBuffer())
-    const attrLocation = gl.getAttribLocation(program, name)
-    gl.vertexAttribPointer(attrLocation, size, gl.FLOAT, false, 0, 0)
-    gl.enableVertexAttribArray(attrLocation)
-    if (instancingDivisor) {
-      instancingExtension.vertexAttribDivisorANGLE(attrLocation, instancingDivisor)
+function Program(gl, vert, frag) {
+  const attributes = {}
+  const uniforms = {}
+  const program = gl.createProgram()
+  gl.attachShader(program, compileShader(gl, vert, gl.VERTEX_SHADER))
+  gl.attachShader(program, compileShader(gl, frag, gl.FRAGMENT_SHADER))
+  gl.linkProgram(program)
+
+  return {
+    use() {
+      gl.useProgram(program)
+    },
+
+    setUniform(type, name, ...values) {
+      if (!uniforms[name]) {
+        uniforms[name] = gl.getUniformLocation(program, name)
+      }
+      gl[`uniform${type}`](uniforms[name], ...values)
+    },
+
+    setAttribute(name, size, usage, instancingDivisor, data) {
+      let attr = attributes[name]
+      if (!attr) {
+        attr = attributes[name] = {
+          buf: gl.createBuffer(),
+          loc: gl.getAttribLocation(program, name)
+        }
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, attr.buf)
+      gl.vertexAttribPointer(attr.loc, size, gl.FLOAT, false, 0, 0)
+      gl.enableVertexAttribArray(attr.loc)
+      instancingExtension.vertexAttribDivisorANGLE(attr.loc, instancingDivisor)
+      gl.bufferData(gl.ARRAY_BUFFER, data, usage)
     }
   }
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffers[name])
-  gl.bufferData(gl.ARRAY_BUFFER, data, usage)
 }
 
-function setUniform(name, ...values) {
-  if (!uniforms[name]) {
-    uniforms[name] = gl.getUniformLocation(program, name)
+function useProgram(name) {
+  let program = programs[name]
+  if (!program) {
+    program = programs[name] = new Program(gl, programSources[name][0], programSources[name][1])
   }
-  gl[`uniform${values.length}f`](uniforms[name], ...values)
+  program.use()
+  return program
 }
 
 export function generate (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
@@ -109,22 +136,16 @@ export function generate (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfEx
   }
 
   // Init shader program
-  if (!program) {
-    program = gl.createProgram()
-    gl.attachShader(program, compileShader(gl, vertexShader, gl.VERTEX_SHADER))
-    gl.attachShader(program, compileShader(gl, fragmentShader, gl.FRAGMENT_SHADER))
-    gl.linkProgram(program)
-  }
-  gl.useProgram(program)
+  let program = useProgram('main')
 
   // Init/update attributes
-  setAttributeBuffer('aUV', 2, gl.STATIC_DRAW, 0, viewportUVs)
-  setAttributeBuffer('aLineSegment', 4, gl.DYNAMIC_DRAW, 1, lineSegmentCoords)
+  program.setAttribute('aUV', 2, gl.STATIC_DRAW, 0, viewportUVs)
+  program.setAttribute('aLineSegment', 4, gl.DYNAMIC_DRAW, 1, lineSegmentCoords)
 
   // Init/update uniforms
-  setUniform('uGlyphBounds', ...viewBox)
-  setUniform('uMaxDistance', maxDistance)
-  setUniform('uExponent', sdfExponent)
+  program.setUniform('4f', 'uGlyphBounds', ...viewBox)
+  program.setUniform('1f', 'uMaxDistance', maxDistance)
+  program.setUniform('1f', 'uExponent', sdfExponent)
 
   // Draw
   gl.clear(gl.COLOR_BUFFER_BIT)
