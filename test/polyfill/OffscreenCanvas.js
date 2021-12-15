@@ -40,7 +40,12 @@ class OffscreenCanvas extends EventTarget {
     if (type !== 'webgl') {
       throw new Error('Only webgl context supported')
     }
-    return this[_context] || (this[_context] = createGlContext(this.width, this.height, webglContextAttrs))
+    let ctx = this[_context]
+    if (!ctx) {
+      ctx = this[_context] = createGlContext(this.width, this.height, webglContextAttrs)
+      ctx.canvas = this
+    }
+    return ctx
   }
 }
 

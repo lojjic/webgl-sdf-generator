@@ -1,4 +1,5 @@
 import { pathToLineSegments } from './path.js'
+import { renderImageData } from './webglUtils.js'
 
 export function generate (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1) {
   const textureData = new Uint8Array(sdfWidth * sdfHeight)
@@ -77,20 +78,34 @@ export function generate (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfEx
 
   /**
    * Determine whether the given point lies inside or outside the glyph. Uses a simple
-   * ray casting algorithm using a ray pointing east from the point.
+   * winding-number ray casting algorithm using a ray pointing east from the point.
    */
   function isPointInPoly (x, y) {
-    let inside = false
+    let winding = 0
     for (let i = segments.length; i--;) {
       const seg = segments[i]
       if (seg.maxX <= x) break //sorting by maxX means no more can cross, so we can short-circuit
       const intersects = ((seg.y1 > y) !== (seg.y2 > y)) && (x < (seg.x2 - seg.x1) * (y - seg.y1) / (seg.y2 - seg.y1) + seg.x1)
       if (intersects) {
-        inside = !inside
+        winding += seg.y1 < seg.y2 ? 1 : -1
       }
     }
-    return inside
+    return winding !== 0
   }
+}
+
+export function generateIntoCanvas(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1, canvas, x = 0, y = 0, channel = 0) {
+  generateIntoFramebuffer(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent, canvas, null, x, y, channel)
+}
+
+export function generateIntoFramebuffer (sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent = 1, glOrCanvas, framebuffer, x = 0, y = 0, channel = 0) {
+  const data = generate(sdfWidth, sdfHeight, path, viewBox, maxDistance, sdfExponent)
+  // Expand single-channel data to rbga
+  const rgbaData = new Uint8Array(data.length * 4)
+  for (let i = 0; i < data.length; i++) {
+    rgbaData[i * 4 + channel] = data[i]
+  }
+  renderImageData(glOrCanvas, rgbaData, x, y, sdfWidth, sdfHeight, 1 << (3 - channel), framebuffer)
 }
 
 /**

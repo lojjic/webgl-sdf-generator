@@ -27,7 +27,7 @@ The `webgl-sdf-generator` package's only export is a factory function which you 
 
 Note that each factory call will result in its own internal WebGL context, which may be useful in some rare cases, but usually you'll just want to call it once and share that single generator object.
 
-### Generate your SDF:
+### Generate a single SDF:
 
 ```js
 const sdfImageData = generator.generate(
@@ -70,4 +70,36 @@ The WebGL implementation also provides method to detect support if you want to t
 const webglSupported = generator.webgl.isSupported()
 ```
 
+### Generate an atlas of many SDFs:
 
+Making a single SDF has its uses, but it's likely that you actually want that SDF to be added to a larger "atlas" image of many SDFs. While you could do that by calling `generator.generate()` as above and manually inserting the returned `Uint8Array` into a larger texture, that isn't optimal because it involves reading pixels back from the GPU for every SDF, which has a performance impact.
+
+Instead, you can generate an SDF directly into a region+channel of a WebGL-enabled `canvas`, populating your "atlas" directly on the GPU. Only the region/channel for the new SDF will be overwritten, the rest will be preserved. That `canvas` can then be used as the source for a WebGL texture for rendering. This ends up being much faster since the data all stays on the GPU.
+
+```js
+generator.generateIntoCanvas(
+  64,                  // width
+  64,                  // height
+  'M0,0L50,25L25,50Z', // path 
+  [-5, -5, 55, 55],    // viewBox
+  25,                  // maxDistance
+  1,                   // exponent
+  yourCanvasElement,   // output canvas
+  128,                 // output x coordinate
+  64,                  // output y coordinate
+  0                    // output color channel              
+)
+```
+
+And similarly for the individual implementations:
+
+```js
+// Same arguments as the main generate():
+generator.webgl.generateIntoCanvas(...args)
+generator.javascript.generateIntoCanvas(...args)
+```
+
+Note that the canvas you pass:
+
+- *must* be WebGL-enabled, meaning that `getContext('webgl')` will succeed for it; you can't give it a canvas with a `2d` context, for example.
+- *should not* be shared with other processes that change the GL context state; `generateIntoCanvas` only sets the exact state it needs and makes no attempt to restore previous state, so sharing it could lead to unpredictable results.

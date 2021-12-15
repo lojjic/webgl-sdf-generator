@@ -2,7 +2,7 @@ require('./polyfill/OffscreenCanvas.js')
 const createSDFGenerator = require('../dist/webgl-sdf-generator.js')
 const assert = require('assert')
 
-const { javascript, webgl } = createSDFGenerator()
+const { javascript, webgl, generate, generateIntoCanvas } = createSDFGenerator()
 
 const captures = [
   {
@@ -23,21 +23,92 @@ const captures = [
   },
 ]
 
+const canvasTestParams = [
+  {
+    canvasCols: 1,
+    square: 0,
+    channel: 0
+  },
+  {
+    canvasCols: 1,
+    square: 0,
+    channel: 2
+  },
+  {
+    canvasCols: 3,
+    square: 4,
+    channel: 0,
+  },
+  {
+    canvasCols: 3,
+    square: 5,
+    channel: 3,
+  }
+]
+
+captures.forEach((capture) => {
+  // Turn 'expected' single-channel data into rgba arrays for various canvas tests
+  capture.expectedForCanvas = canvasTestParams.map(({canvasCols, square, channel}) => {
+    const canvasSize = canvasCols * capture.size
+    const expected = new Uint8Array(Math.pow(canvasCols * capture.size, 2) * 4)
+    const x = (square % canvasCols) * capture.size
+    const y = Math.floor(square / canvasCols) * capture.size
+    const baseStartIndex = y * canvasSize * 4 //full rows
+      + x * 4 //partial row
+      + channel
+    for (let y = 0; y < capture.size; y++) {
+      const srcStartIndex = y * capture.size
+      const rowStartIndex = baseStartIndex + (y * canvasSize * 4)
+      for (let x = 0; x < capture.size; x++) {
+        expected[rowStartIndex + x * 4] = capture.expected[srcStartIndex + x]
+      }
+    }
+    return { canvasSize, x, y, channel, expected }
+  })
+})
+
+function testGenerateMethod(generatorFunc) {
+  for (const {expected, path, size, exponent, spread, viewBox} of captures) {
+    const result = generatorFunc(size, size, path, viewBox, spread, exponent)
+    assert.deepEqual([...result], expected)
+  }
+}
+
+function testGenerateIntoCanvasMethod (generatorFunc) {
+  for (const {expectedForCanvas, path, size, exponent, spread, viewBox} of captures) {
+    for (const {canvasSize, x, y, channel, expected} of expectedForCanvas) {
+      const canvas = new OffscreenCanvas(canvasSize, canvasSize)
+      generatorFunc(size, size, path, viewBox, spread, exponent, canvas, x, y, channel)
+      const result = new Uint8Array(canvasSize * canvasSize * 4)
+      const gl = canvas.getContext('webgl')
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.readPixels(0, 0, canvasSize, canvasSize, gl.RGBA, gl.UNSIGNED_BYTE, result)
+      assert.deepEqual(result, expected)
+    }
+  }
+}
+
 const tests = [
-  function webglSupport () {
+  function webgl_isSupported () {
     assert(webgl.isSupported())
   },
-  function webglGeneration () {
-    for (const {expected, path, size, exponent, spread, viewBox} of captures) {
-      const result = webgl.generate(size, size, path, viewBox, spread, exponent)
-      assert.deepEqual([...result], expected)
-    }
+  function webgl_generate () {
+    testGenerateMethod(webgl.generate)
   },
-  function jsGeneration () {
-    for (const {expected, path, size, exponent, spread, viewBox} of captures) {
-      const result = javascript.generate(size, size, path, viewBox, spread, exponent)
-      assert.deepEqual([...result], expected)
-    }
+  function webgl_generateIntoCanvas () {
+    testGenerateIntoCanvasMethod(webgl.generateIntoCanvas)
+  },
+  function javascript_generate () {
+    testGenerateMethod(javascript.generate)
+  },
+  function javascript_generateIntoCanvas () {
+    testGenerateIntoCanvasMethod(javascript.generateIntoCanvas)
+  },
+  function combined_generate () {
+    testGenerateMethod(generate)
+  },
+  function combined_generateIntoCanvas () {
+    testGenerateIntoCanvasMethod(generateIntoCanvas)
   },
 ]
 

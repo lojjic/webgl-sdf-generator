@@ -17,7 +17,7 @@ export default [
     plugins: [
       glsl({
         include: '**/*.glsl',
-        compress: false
+        compress: true
       }),
       // Transpile down to ES5 for all build artifacts. This helps ensure that downstream
       // transpilers won't inject references to external helpers/polyfills, which would

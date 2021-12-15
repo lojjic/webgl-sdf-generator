@@ -13,14 +13,17 @@ float absDistToSegment(vec2 point, vec2 lineA, vec2 lineB) {
   return distance(point, linePt);
 }
 
-bool isCrossing(vec2 point, vec2 lineA, vec2 lineB) {
-  return (lineA.y > point.y != lineB.y > point.y) &&
-  (point.x < (lineB.x - lineA.x) * (point.y - lineA.y) / (lineB.y - lineA.y) + lineA.x);
-}
-
 void main() {
-  float dist = absDistToSegment(vGlyphXY, vLineSegment.xy, vLineSegment.zw);
+  vec4 seg = vLineSegment;
+  vec2 p = vGlyphXY;
+  // Find unsigned distance to the segment; only the nearest will be kept
+  float dist = absDistToSegment(p, seg.xy, seg.zw);
+  // Apply the exponential transform
   float val = pow(1.0 - clamp(dist / uMaxDistance, 0.0, 1.0), uExponent) * 0.5;
-  bool crossing = isCrossing(vGlyphXY, vLineSegment.xy, vLineSegment.zw);
-  gl_FragColor = vec4(val, 0.0, 0.0, crossing ? 1.0 / 256.0 : 0.0);
+  // Project a ray eastward and if it crosses the segment, increment either the red or green channel
+  // depending on the direction of crossing. After all segments are processed this will be used as a
+  // "winding number" to tell us whether we're inside or outside the glyph.
+  bool crossing = (seg.y > p.y != seg.w > p.y) && (p.x < (seg.z - seg.x) * (p.y - seg.y) / (seg.w - seg.y) + seg.x);
+  bool crossingUp = crossing && vLineSegment.y < vLineSegment.w;
+  gl_FragColor = vec4(crossingUp ? 1.0 / 255.0 : 0.0, crossing && !crossingUp ? 1.0 / 255.0 : 0.0, 0.0, val);
 }
