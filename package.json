@@ -1,6 +1,6 @@
 {
   "name": "webgl-sdf-generator",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "WebGL-accelerated signed distance field generation for 2D paths",
   "main": "dist/webgl-sdf-generator.js",
   "module": "dist/webgl-sdf-generator.mjs",
