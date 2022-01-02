@@ -9,8 +9,9 @@ import postFragment from './shaders/post.fragment.glsl'
 const viewportUVs = new Float32Array([0, 0, 2, 0, 0, 2])
 
 let implicitContext = null
-let supported = null
 let isTestingSupport = false
+const NULL_OBJECT = {}
+const supportByCanvas = new WeakMap() // canvas -> bool
 
 function validateSupport (glOrCanvas) {
   if (!isTestingSupport && !isSupported(glOrCanvas)) {
@@ -157,7 +158,9 @@ export function generateIntoFramebuffer (sdfWidth, sdfHeight, path, viewBox, max
 }
 
 export function isSupported (glOrCanvas) {
-  if (supported === null) {
+  const key = (!glOrCanvas || glOrCanvas === implicitContext) ? NULL_OBJECT : (glOrCanvas.canvas || glOrCanvas)
+  let supported = supportByCanvas.get(key)
+  if (supported === undefined) {
     isTestingSupport = true
     let failReason = null
     try {
@@ -194,6 +197,7 @@ export function isSupported (glOrCanvas) {
       console.warn('WebGL SDF generation not supported:', failReason)
     }
     isTestingSupport = false
+    supportByCanvas.set(key, supported)
   }
   return supported
 }
