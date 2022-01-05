@@ -36,26 +36,23 @@ export function forEachPathCommand(pathString, commandCallback) {
   const segmentRE = /([MLQCZ])([^MLQCZ]*)/g
   let match, firstX, firstY, prevX, prevY
   while ((match = segmentRE.exec(pathString))) {
-    const args = match[2]
-      .replace(/^\s*|\s*$/g, '')
-      .split(/[,\s]+/)
-      .map((v) => parseFloat(v))
+    const args = match[2].split(/[,\s]+/)
     switch (match[1]) {
       case 'M':
-        prevX = firstX = args[0]
-        prevY = firstY = args[1]
+        prevX = firstX = +args[0]
+        prevY = firstY = +args[1]
         break
       case 'L':
-        if (args[0] !== prevX || args[1] !== prevY) { // yup, some fonts have zero-length line commands
-          commandCallback('L', prevX, prevY, (prevX = args[0]), (prevY = args[1]))
+        if (+args[0] !== prevX || +args[1] !== prevY) { // yup, some fonts have zero-length line commands
+          commandCallback('L', prevX, prevY, (prevX = +args[0]), (prevY = +args[1]))
         }
         break
       case 'Q': {
-        commandCallback('Q', prevX, prevY, (prevX = args[2]), (prevY = args[3]), args[0], args[1])
+        commandCallback('Q', prevX, prevY, (prevX = +args[2]), (prevY = +args[3]), +args[0], +args[1])
         break
       }
       case 'C': {
-        commandCallback('C', prevX, prevY, (prevX = args[4]), (prevY = args[5]), args[0], args[1], args[2], args[3])
+        commandCallback('C', prevX, prevY, (prevX = +args[4]), (prevY = +args[5]), +args[0], +args[1], +args[2], +args[3])
         break
       }
       case 'Z':
